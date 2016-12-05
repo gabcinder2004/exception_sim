@@ -70,30 +70,6 @@ type Players []Player
 
 var classes Classes
 
-func simulate(rw http.ResponseWriter, req *http.Request) {
-	decoder := json.NewDecoder(req.Body)
-	var players Players
-	err := decoder.Decode(&players)
-	if err != nil {
-		panic(err)
-	}
-
-	defer req.Body.Close()
-
-	// var wg sync.WaitGroup
-	// for index := range players {
-	// 	wg.Add(1)
-	// 	var p = players[index]
-	// 	go func() {
-	// 		defer wg.Done()
-	// 		p.DPS = getDps(p.Country, p.Realm, p.Name)
-	// 	}()
-	// }
-
-	// wg.Wait()
-	json.NewEncoder(rw).Encode(players)
-}
-
 func getClasses() {
 	s := BattleNetAPI + "data/character/classes?locale=en_US&apikey=" + apiKey
 	fmt.Println(s)
@@ -153,6 +129,7 @@ func getGuild(w http.ResponseWriter, r *http.Request) {
 }
 
 func getDps(char *Character) {
+	//TODO: don't hardcode this
 	setEnv("PATH", "C:\\Simulationcraft(x64)\\710-03")
 	path, err := exec.LookPath("simc.exe")
 
@@ -194,7 +171,6 @@ func main() {
 
 	port := "9343"
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/simulate", simulate)
 	router.HandleFunc("/guild/{country}/{realm}/{guild}", getGuild)
 	err := http.ListenAndServe(":"+port, router)
 
@@ -207,75 +183,3 @@ func main() {
 
 	log.Println("Successfully started HTTP server on port " + port)
 }
-
-//////////////////////////////////////
-
-// package main
-
-// import (
-// 	"encoding/json"
-// 	"log"
-// 	"net/http"
-
-// 	"github.com/gorilla/mux"
-// )
-
-// type Person struct {
-// 	ID        string   `json:"id,omitempty"`
-// 	Firstname string   `json:"firstname,omitempty"`
-// 	Lastname  string   `json:"lastname,omitempty"`
-// 	Address   *Address `json:"address,omitempty"`
-// }
-
-// type Address struct {
-// 	City  string `json:"city,omitempty"`
-// 	State string `json:"state,omitempty"`
-// }
-
-// var people []Person
-
-// func GetPersonEndpoint(w http.ResponseWriter, req *http.Request) {
-// 	params := mux.Vars(req)
-// 	for _, item := range people {
-// 		if item.ID == params["id"] {
-// 			json.NewEncoder(w).Encode(item)
-// 			return
-// 		}
-// 	}
-// 	json.NewEncoder(w).Encode(&Person{})
-// }
-
-// func GetPeopleEndpoint(w http.ResponseWriter, req *http.Request) {
-// 	json.NewEncoder(w).Encode(people)
-// }
-
-// func CreatePersonEndpoint(w http.ResponseWriter, req *http.Request) {
-// 	params := mux.Vars(req)
-// 	var person Person
-// 	_ = json.NewDecoder(req.Body).Decode(&person)
-// 	person.ID = params["id"]
-// 	people = append(people, person)
-// 	json.NewEncoder(w).Encode(people)
-// }
-
-// func DeletePersonEndpoint(w http.ResponseWriter, req *http.Request) {
-// 	params := mux.Vars(req)
-// 	for index, item := range people {
-// 		if item.ID == params["id"] {
-// 			people = append(people[:index], people[index+1:]...)
-// 			break
-// 		}
-// 	}
-// 	json.NewEncoder(w).Encode(people)
-// }
-
-// func main() {
-// 	router := mux.NewRouter()
-// 	people = append(people, Person{ID: "1", Firstname: "Nic", Lastname: "Raboy", Address: &Address{City: "Dublin", State: "CA"}})
-// 	people = append(people, Person{ID: "2", Firstname: "Maria", Lastname: "Raboy"})
-// 	router.HandleFunc("/people", GetPeopleEndpoint).Methods("GET")
-// 	router.HandleFunc("/people/{id}", GetPersonEndpoint).Methods("GET")
-// 	router.HandleFunc("/people/{id}", CreatePersonEndpoint).Methods("POST")
-// 	router.HandleFunc("/people/{id}", DeletePersonEndpoint).Methods("DELETE")
-// 	log.Fatal(http.ListenAndServe(":12345", router))
-// }
