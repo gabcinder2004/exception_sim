@@ -11,8 +11,6 @@ import (
 	"regexp"
 	"strings"
 
-	"sync"
-
 	"github.com/gorilla/mux"
 )
 
@@ -72,7 +70,6 @@ var classes Classes
 
 func getClasses() {
 	s := BattleNetAPI + "data/character/classes?locale=en_US&apikey=" + apiKey
-	fmt.Println(s)
 
 	resp, err := http.Get(s)
 
@@ -95,11 +92,8 @@ func findClass(char *Character) {
 
 func getGuild(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-
-	s := BattleNetAPI + "guild/" + vars["realm"] + "/" + vars["guild"] + "?fields=members&locale=en_US&apikey=" + apiKey
-	log.Println(s)
-
-	resp, err := http.Get(s)
+	url := BattleNetAPI + "guild/" + vars["realm"] + "/" + vars["guild"] + "?fields=members&locale=en_US&apikey=" + apiKey
+	resp, err := http.Get(url)
 
 	if err != nil {
 		panic(err)
@@ -109,35 +103,37 @@ func getGuild(w http.ResponseWriter, r *http.Request) {
 	var g Guild
 	json.NewDecoder(resp.Body).Decode(&g)
 
-	var wg sync.WaitGroup
+	///////////////
+	concurrency := 5
+	sem := make(chan bool, concurrency)
 	for index := range g.GuildMembers {
-
-		wg.Add(1)
-		var ch = g.GuildMembers[index].Character
-
+		sem <- true
 		go func() {
-			defer wg.Done()
-			findClass(&ch)
+			defer func() { <-sem }()
+			findClass(&g.GuildMembers[index].Character)
 
-			if ch.Spec.Role == "DPS" && ch.Level == 110 {
-				getDps(&ch)
-			}
+			// if g.GuildMembers[index].Character.Spec.Role == "DPS" && g.GuildMembers[index].Character.Level == 110 {
+			// 	getDps(&g.GuildMembers[index].Character)
+			// }
 		}()
 	}
-	wg.Wait()
+
+	for i := 0; i < cap(sem); i++ {
+		sem <- true
+	}
+	/////////////////
+
 	json.NewEncoder(w).Encode(g)
 }
 
 func getDps(char *Character) {
-	//TODO: don't hardcode this
-	setEnv("PATH", "C:\\Simulationcraft(x64)\\710-03")
-	path, err := exec.LookPath("simc.exe")
+	path, err := exec.LookPath("simc")
 
 	if err != nil {
 		log.Fatal("cannot find path")
 	}
 
-	fmt.Println("Simming " + char.Name)
+	fmt.Println("Simming " + char.Name + "(" + char.Spec.Role + ")")
 	var args = fmt.Sprint("armory=us,", char.Realm, ",", char.Name)
 	cmd := exec.Command(path, args)
 	var out bytes.Buffer
@@ -152,9 +148,11 @@ func getDps(char *Character) {
 	test := re.FindString(out.String())
 	words := strings.Fields(test)
 
-	if len(words) == 0 {
+	if len(words) < 2 {
 		char.DPS = "n/a"
+		return
 	}
+
 	fmt.Println("Simulated: " + char.Name + "-" + char.Realm + " | " + words[1])
 	char.DPS = words[1]
 }
@@ -167,6 +165,7 @@ func setEnv(key, value string) {
 }
 
 func main() {
+	fmt.Println("EXCEPTION SIM v0.5")
 	getClasses()
 
 	port := "9343"
